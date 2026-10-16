@@ -1,11 +1,9 @@
-// Shared API configuration and a small fetch wrapper used by all handlers.
-
-// The backend does not send CORS headers, so in development requests go
-// through Vite's dev-server proxy (see vite.config.ts) at /api.
-// In a production build the API URL is used directly.
+// Development: requests go through Vite's proxy at /api (see vite.config.ts).
+// Production build: the API is called directly, so it must allow the site's
+// origin in its CORS settings. A trailing slash in the env value is ignored.
 const API_BASE_URL: string = import.meta.env.DEV
   ? '/api'
-  : import.meta.env.VITE_API_URL
+  : (import.meta.env.VITE_API_URL ?? '').replace(/\/+$/, '')
 
 export class ApiError extends Error {
   readonly status: number

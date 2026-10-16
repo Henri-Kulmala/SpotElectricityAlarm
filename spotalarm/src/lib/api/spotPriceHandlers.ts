@@ -1,4 +1,4 @@
-import type { CheapestWindowResponse, SpotPricesResponse } from '../../types/api'
+import type { CheapestWindowResponse, SpotPricesResponse } from '@/types/api'
 import { apiGet } from './apiContext'
 
 /** Hourly prices. Without from/to the backend returns about -24 h ... +36 h. */
