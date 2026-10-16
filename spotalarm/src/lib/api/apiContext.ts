@@ -1,0 +1,63 @@
+// Shared API configuration and a small fetch wrapper used by all handlers.
+
+// The backend does not send CORS headers, so in development requests go
+// through Vite's dev-server proxy (see vite.config.ts) at /api.
+// In a production build the API URL is used directly.
+const API_BASE_URL: string = import.meta.env.DEV
+  ? '/api'
+  : import.meta.env.VITE_API_URL
+
+export class ApiError extends Error {
+  readonly status: number
+
+  constructor(status: number, message: string) {
+    super(message)
+    this.name = 'ApiError'
+    this.status = status
+  }
+}
+
+type QueryParams = Record<string, string | number | undefined>
+
+function buildUrl(path: string, params?: QueryParams): string {
+  const search = new URLSearchParams()
+  for (const [key, value] of Object.entries(params ?? {})) {
+    if (value !== undefined) search.set(key, String(value))
+  }
+  const query = search.toString()
+  return `${API_BASE_URL}${path}${query ? `?${query}` : ''}`
+}
+
+// Error bodies are { error } from the Lambda or { message } from API Gateway.
+async function readErrorMessage(response: Response): Promise<string> {
+  if (response.status === 429) return 'Liian monta pyyntöä, yritä hetken päästä uudelleen.'
+  try {
+    const body = await response.json()
+    return body.error ?? body.message ?? `HTTP ${response.status}`
+  } catch {
+    return `HTTP ${response.status}`
+  }
+}
+
+export async function apiGet<T>(
+  path: string,
+  params?: QueryParams,
+  signal?: AbortSignal,
+): Promise<T> {
+  if (!API_BASE_URL) {
+    throw new ApiError(0, 'VITE_API_URL puuttuu (.env.local)')
+  }
+
+  let response: Response
+  try {
+    response = await fetch(buildUrl(path, params), { signal })
+  } catch (err) {
+    if (err instanceof DOMException && err.name === 'AbortError') throw err
+    throw new ApiError(0, 'Verkkovirhe: rajapintaan ei saatu yhteyttä.')
+  }
+
+  if (!response.ok) {
+    throw new ApiError(response.status, await readErrorMessage(response))
+  }
+  return (await response.json()) as T
+}
